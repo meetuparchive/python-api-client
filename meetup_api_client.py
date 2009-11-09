@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import datetime
 import oauth
 import time
@@ -365,3 +367,26 @@ class UnauthorizedError(ClientException):
 class BadRequestError(ClientException):
     pass;
 
+if __name__ == '__main__':
+  """
+    Simple, partial test of client. Obtains a request token for the given consumer
+    creditials and opens authorization in a browser. Note that the application
+    may only be authorized once per user. If you'd like to test authorization again
+    you must first remove the app from your account:
+    http://www.meetup.com/account/oauth_apps/
+  """
+  from optparse import OptionParser
+  import webbrowser
+  usage = "usage: %prog consumer-key consumer-secret"
+  parser = OptionParser(usage)
+  (options, args) = parser.parse_args()
+  if (len(args)) != 2:
+    parser.error("Please supply your consumer key and consumer secret.")
+    
+  mucli = MeetupOAuth(args[0], args[1])
+  oauth_session = mucli.new_session()
+  oauth_session.fetch_request_token()
+  url = oauth_session.get_authorize_url()
+  print "Opening a browser on the authorization page: %s" % url
+  webbrowser.open(url)
+  
