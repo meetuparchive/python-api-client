@@ -196,12 +196,13 @@ class MeetupOAuth(Meetup):
             url_args['format'] = 'json'
             oauth_access = oauth.OAuthRequest.from_consumer_and_token(self.consumer, 
                                                                       token = temp_access_token,
-                                                                      http_url="http://api" + DEV + ".meetup.com/",
+                                                                      http_url="http://api" + DEV + ".meetup.com/" + uri + "/",
                                                                       parameters=url_args)
             oauth_access.sign_request(signature_method, self.consumer, temp_access_token)
-            url_args.update(oauth_access.get_oauth_parameters());
-        args = urllib.urlencode(url_args)
-        url = API_BASE_URL + uri + '/' + "?" + args
+            url = oauth_access.to_url()
+        else:
+            args = urllib.urlencode(url_args)
+            url = API_BASE_URL + uri + '/' + "?" + args
         print "requesting %s" % (url)
         try:
            request = urllib2.Request(url)
