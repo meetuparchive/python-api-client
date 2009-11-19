@@ -3,10 +3,8 @@
 import datetime
 import oauth
 import time
-import urllib
-import httplib
-import urllib2 
-from urllib2 import HTTPError
+from urllib import urlencode
+from urllib2 import HTTPError, urlopen, Request
 
 # This is an example of a client wrapper that you can use to
 # make calls to the Meetup.com API. It requires that you have 
@@ -28,8 +26,6 @@ try:
 except:
     print "Error - your system is missing support for a JSON parsing library."
 
-DEV = ''
-API_BASE_URL = 'http://api' + DEV + '.meetup.com/'
 GROUPS_URI = 'groups'
 EVENTS_URI = 'events'
 CITIES_URI = 'cities'
@@ -37,9 +33,9 @@ TOPICS_URI = 'topics'
 PHOTOS_URI = 'photos'
 MEMBERS_URI = 'members'
 RSVPS_URI = 'rsvps'
-REQUESTTOKEN_URL = 'http://www' + DEV + '.meetup.com/oauth/request/'
-ACCESSTOKEN_URL = 'http://www' + DEV + '.meetup.com/oauth/access/'
-AUTH_URL = 'http://www' + DEV + '.meetup.com/oauth/az/'
+API_BASE_URL = 'http://api.meetup.com/'
+OAUTH_BASE_URL = 'http://www.meetup.com/'
+
 
 signature_method_plaintext = oauth.OAuthSignatureMethod_PLAINTEXT()
 signature_method_hmac = oauth.OAuthSignatureMethod_HMAC_SHA1()
@@ -83,15 +79,11 @@ class Meetup(object):
         url_args['format'] = 'json'
         if self.api_key:
             url_args['key'] = self.api_key
-        args = urllib.urlencode(url_args)
+        args = urlencode(url_args)
         url = API_BASE_URL + uri + '/' + "?" + args
         print "requesting %s" % (url)
         try:
-           request = urllib2.Request(url)
-           stream = urllib2.urlopen(request)
-           data = stream.read()
-           stream.close()
-           return parse_json(data)  
+           return parse_json(urlopen(url).read())
         except HTTPError, e:
            error_json = parse_json(e.read())
            if e.code == 401:
@@ -100,40 +92,6 @@ class Meetup(object):
                raise BadRequestError(error_json)
            else:
                raise ClientException(error_json)
-
-class SimpleOAuthClient(oauth.OAuthClient):
-
-    def __init__(self, server, port=httplib.HTTP_PORT, request_token_url='', access_token_url='', authorization_url=''):
-        self.server = server
-        self.port = port
-        self.request_token_url = request_token_url
-        self.access_token_url = access_token_url
-        self.authorization_url = authorization_url
-        self.connection = httplib.HTTPConnection("%s:%d" % (self.server, self.port))
-
-    def fetch_request_token(self, oauth_request):
-        self.connection.request(oauth_request.http_method, self.request_token_url, headers=oauth_request.to_header()) 
-        response = self.connection.getresponse()
-        result = response.read()
-        print result
-        return oauth.OAuthToken.from_string(result)
-
-    def fetch_access_token(self, oauth_request):
-        self.connection.request(oauth_request.http_method, self.access_token_url, headers=oauth_request.to_header()) 
-        response = self.connection.getresponse()
-        result = response.read()
-        return oauth.OAuthToken.from_string(result)
-
-    def authorize_token(self, oauth_request):
-        self.connection.request(oauth_request.http_method, oauth_request.to_url()) 
-        response = self.connection.getresponse()
-        return response.read()
-
-    def access_resource(self, oauth_request):
-        headers = {'Content-Type' :'application/x-www-form-urlencoded'}
-        self.connection.request('POST', RESOURCE_URL, body=oauth_request.to_postdata(), headers=headers)
-
-oauth_client = SimpleOAuthClient('www' + DEV + '.meetup.com', 80, REQUESTTOKEN_URL, ACCESSTOKEN_URL, AUTH_URL)
 
 class NoToken(Exception):
     def __init__(self, description):
@@ -149,28 +107,27 @@ class MeetupOAuthSession:
         self.request_token = request_token
         self.access_token = access_token
 
-    def fetch_request_token(self, signature_method=signature_method_plaintext):
-        oauth_req = oauth.OAuthRequest.from_consumer_and_token(self.consumer, http_url=REQUESTTOKEN_URL)
+    def fetch_request_token(self, signature_method=signature_method_hmac):
+        oauth_req = oauth.OAuthRequest.from_consumer_and_token(self.consumer, http_url=(OAUTH_BASE_URL + 'oauth/request/'))
         oauth_req.sign_request(signature_method, self.consumer, None)
-        self.request_token = oauth_client.fetch_request_token(oauth_req)
+        token_string = urlopen(Request(oauth_req.http_url, headers=oauth_req.to_header())).read()
+        self.request_token = oauth.OAuthToken.from_string(token_string)
 
     def get_authorize_url(self, oauth_callback=None):
         if oauth_callback:
-            callbackUrl = "&" + urllib.urlencode({"oauth_callback":oauth_callback})
+            callbackUrl = "&" + urlencode({"oauth_callback":oauth_callback})
         else:
             callbackUrl = ""
-        return "http://www" + DEV + ".meetup.com/authorize/?oauth_token=%s%s" % (self.request_token.key, callbackUrl)
+        return OAUTH_BASE_URL + "authorize/?oauth_token=%s%s" % (self.request_token.key, callbackUrl)
 
-    def fetch_access_token(self, signature_method=signature_method_plaintext, request_token=None):
+    def fetch_access_token(self, signature_method=signature_method_hmac, request_token=None):
         temp_request_token = request_token or self.request_token
         if not temp_request_token:
             raise NoToken("You must provide a request token to exchange for an access token")
-        oauth_req = oauth.OAuthRequest.from_consumer_and_token(self.consumer, token=temp_request_token, http_url=ACCESSTOKEN_URL)
-        oauth_req.sign_request(signature_method_hmac, self.consumer, temp_request_token)
-        print oauth_req.to_header()
-        token = oauth_client.fetch_access_token(oauth_req)
-        if token:
-            self.access_token = token
+        oauth_req = oauth.OAuthRequest.from_consumer_and_token(self.consumer, token=temp_request_token, http_url=OAUTH_BASE_URL + 'oauth/access/')
+        oauth_req.sign_request(signature_method, self.consumer, temp_request_token)
+        token_string = urlopen(Request(oauth_req.http_url, headers=oauth_req.to_header())).read()
+        self.access_token = oauth.OAuthToken.from_string(token_string)
 
 class MeetupOAuth(Meetup):
 
@@ -196,20 +153,16 @@ class MeetupOAuth(Meetup):
             url_args['format'] = 'json'
             oauth_access = oauth.OAuthRequest.from_consumer_and_token(self.consumer, 
                                                                       token = temp_access_token,
-                                                                      http_url="http://api" + DEV + ".meetup.com/" + uri + "/",
+                                                                      http_url=API_BASE_URL + uri + "/",
                                                                       parameters=url_args)
             oauth_access.sign_request(signature_method, self.consumer, temp_access_token)
             url = oauth_access.to_url()
         else:
-            args = urllib.urlencode(url_args)
+            args = urlencode(url_args)
             url = API_BASE_URL + uri + '/' + "?" + args
         print "requesting %s" % (url)
         try:
-           request = urllib2.Request(url)
-           stream = urllib2.urlopen(request)
-           data = stream.read()
-           stream.close()
-           return parse_json(data)  
+           return parse_json(urlopen(url).read())
         except HTTPError, e:
            error_json = parse_json(e.read())
            if e.code == 401:
@@ -368,26 +321,3 @@ class UnauthorizedError(ClientException):
 class BadRequestError(ClientException):
     pass;
 
-if __name__ == '__main__':
-  """
-    Simple, partial test of client. Obtains a request token for the given consumer
-    creditials and opens authorization in a browser. Note that the application
-    may only be authorized once per user. If you'd like to test authorization again
-    you must first remove the app from your account:
-    http://www.meetup.com/account/oauth_apps/
-  """
-  from optparse import OptionParser
-  import webbrowser
-  usage = "usage: %prog consumer-key consumer-secret"
-  parser = OptionParser(usage)
-  (options, args) = parser.parse_args()
-  if (len(args)) != 2:
-    parser.error("Please supply your consumer key and consumer secret.")
-    
-  mucli = MeetupOAuth(args[0], args[1])
-  oauth_session = mucli.new_session()
-  oauth_session.fetch_request_token()
-  url = oauth_session.get_authorize_url()
-  print "Opening a browser on the authorization page: %s" % url
-  webbrowser.open(url)
-  
