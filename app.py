@@ -17,12 +17,8 @@ from meetup_api_client import *
 from optparse import OptionParser
 import webbrowser
 
-def get_api(config_name=None):
-    config_name, config = get_config(config_name)
-    client = get_client(config)
-    access_key, access_secret = get_token(config, 'access')
-    oauth_session = client.new_session(access_key=access_key, access_secret=access_secret)
-    return client, oauth_session
+def config_client(config_name=None):
+    return get_client(get_config(config_name)[1])
 
 def get_config(name=None):
     name = name or 'app.cfg'
@@ -39,7 +35,11 @@ def get_config(name=None):
     
 def get_client(config):
     consumer_key, consumer_secret = get_token(config, 'consumer')
-    return mac.MeetupOAuth(consumer_key, consumer_secret)
+    if config.has_section('access'):
+        access_key, access_secret = get_token(config, 'access')
+        return mac.MeetupOAuth(consumer_key, consumer_secret, access_key=access_key, access_secret=access_secret)
+    else:
+        return mac.MeetupOAuth(consumer_key, consumer_secret)
 
 def get_token(config, name): return config.get(name, 'key'), config.get(name, 'secret')
 def set_token(config, name, key, secret):

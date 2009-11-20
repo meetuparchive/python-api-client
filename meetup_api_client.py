@@ -131,10 +131,12 @@ class MeetupOAuthSession:
 
 class MeetupOAuth(Meetup):
 
-    def __init__(self, oauth_consumer_key, oauth_consumer_secret):
+    def __init__(self, oauth_consumer_key, oauth_consumer_secret, access_key=None, access_secret=None):
         self.oauth_consumer_key = oauth_consumer_key
         self.oauth_consumer_secret = oauth_consumer_secret
         self.consumer = oauth.OAuthConsumer(self.oauth_consumer_key, self.oauth_consumer_secret)
+        if access_key and access_secret:
+            self.oauth_session = self.new_session(access_key=access_key, access_secret=access_secret)
 
     def new_session(self, request_key=None, request_secret=None, access_key=None, access_secret=None):
         if request_secret and request_key:
@@ -147,19 +149,22 @@ class MeetupOAuth(Meetup):
             access_token = None
         return MeetupOAuthSession(self.consumer, request_token, access_token)
 
-    def _fetch(self, uri, oauthreq=None, signature_method=signature_method_plaintext, use_access_token=None, use_access_token_secret=None, **url_args):
-        temp_access_token = oauthreq.access_token
-        if temp_access_token:
-            url_args['format'] = 'json'
-            oauth_access = oauth.OAuthRequest.from_consumer_and_token(self.consumer, 
-                                                                      token = temp_access_token,
-                                                                      http_url=API_BASE_URL + uri + "/",
-                                                                      parameters=url_args)
-            oauth_access.sign_request(signature_method, self.consumer, temp_access_token)
-            url = oauth_access.to_url()
-        else:
-            args = urlencode(url_args)
-            url = API_BASE_URL + uri + '/' + "?" + args
+    def _fetch(self, uri, sess=None, oauthreq=None, signature_method=signature_method_plaintext, **url_args):
+        # the oauthreq parameter name is deprecated, please use sess or bind the session in __init__
+        session = self.oauth_session or sess or oauthreq
+        if not session:
+            raise BadRequestError("MeetupOAuth client requires either a bound MeetupOAuthSession or one in the `sess` argument.")
+        if not session.access_token:
+            raise BadRequestError("Current MeetupOAuthSession does not have an access_token.")
+        
+        url_args['format'] = 'json'
+        oauth_access = oauth.OAuthRequest.from_consumer_and_token(self.consumer, 
+                                                                  token = session.access_token,
+                                                                  http_url=API_BASE_URL + uri + "/",
+                                                                  parameters=url_args)
+        oauth_access.sign_request(signature_method, self.consumer, session.access_token)
+        url = oauth_access.to_url()
+
         print "requesting %s" % (url)
         try:
            return parse_json(urlopen(url).read())
@@ -238,7 +243,8 @@ class Group(API_Item):
     datafields = [ 'id','name','link','updated',\
                    'members','created','photo_url',\
                    'description','zip','lat','lon',\
-                   'city','state','country','organizerProfileURL']
+                   'city','state','country','organizerProfileURL', \
+                   'topics']
     
     def __str__(self):
          return "%s (%s)" % (self.name, self.link)
