@@ -33,6 +33,7 @@ TOPICS_URI = 'topics'
 PHOTOS_URI = 'photos'
 MEMBERS_URI = 'members'
 RSVPS_URI = 'rsvps'
+COMMENTS_URI = 'comments'
 API_BASE_URL = 'http://api.meetup.com/'
 OAUTH_BASE_URL = 'http://www.meetup.com/'
 
@@ -74,6 +75,9 @@ class Meetup(object):
 
     def get_members(self, **args):
         return API_Response(self._fetch(MEMBERS_URI, **args), MEMBERS_URI) 
+
+    def get_comments(self, **args):
+        return API_Response(self._fetch(COMMENTS_URI, **args), COMMENTS_URI) 
 
     def _fetch(self, uri, **url_args):
         url_args['format'] = 'json'
@@ -188,7 +192,8 @@ class API_Response(object):
                        CITIES_URI:City, 
                        MEMBERS_URI:Member,
                        PHOTOS_URI:Photo,
-                       RSVPS_URI:Rsvp}
+                       RSVPS_URI:Rsvp,
+                       COMMENTS_URI:Comment}
          self.results = [uriclasses[uritype](item) for item in json['results']]
 
     def __str__(self):
@@ -292,6 +297,14 @@ class Topic(API_Item):
     def get_photos(self, apiclient, **extraparams):
          extraparams['topic_id'] = self.id
          return apiclient.get_photos(**extraparams)
+
+class Comment(API_Item):
+    datafields = ['name','link','comment','rating','photo_url',\
+                  'created','lat','lon','country','city','state']
+    
+    def __str__(self):
+         return "Comment from %s (%s)" % (self.name, self.link)
+
 
 def _unicodify(json):
     """Makes all strings in the given JSON-like structure unicode."""
