@@ -18,11 +18,11 @@ try:
         parse_json = lambda s: cjson.decode(s.decode(API_JSON_ENCODING), True)
     except ImportError:
         try:
+            import json
+            parse_json = lambda s: json.loads(s.decode(API_JSON_ENCODING))
+        except ImportError:
             import simplejson
             parse_json = lambda s: simplejson.loads(s.decode(API_JSON_ENCODING))
-        except ImportError:
-            import json
-            parse_json = lambda s: _unicodify(json.read(s))
 except:
     print "Error - your system is missing support for a JSON parsing library."
 
@@ -153,7 +153,7 @@ class MeetupOAuth(Meetup):
             access_token = None
         return MeetupOAuthSession(self.consumer, request_token, access_token)
 
-    def _fetch(self, uri, sess=None, oauthreq=None, signature_method=signature_method_plaintext, **url_args):
+    def _fetch(self, uri, sess=None, oauthreq=None, signature_method=signature_method_hmac, **url_args):
         # the oauthreq parameter name is deprecated, please use sess or bind the session in __init__
         session = self.oauth_session or sess or oauthreq
         if not session:
@@ -304,22 +304,6 @@ class Comment(API_Item):
     
     def __str__(self):
          return "Comment from %s (%s)" % (self.name, self.link)
-
-
-def _unicodify(json):
-    """Makes all strings in the given JSON-like structure unicode."""
-    try:
-        if isinstance(json, str):
-            return json.decode(API_JSON_ENCODING).encode('utf-8')
-        elif isinstance(json, dict):
-            for name in json:
-                json[name] = _unicodify(json[name])
-        elif isinstance(json, list):
-            for part in json:
-                _unicodify(part)
-    except:
-        print 'decoding error: ' +  json
-    return json     
 
 ########################################
 
