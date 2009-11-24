@@ -33,6 +33,7 @@ TOPICS_URI = 'topics'
 PHOTOS_URI = 'photos'
 MEMBERS_URI = 'members'
 RSVPS_URI = 'rsvps'
+RSVP_URI = 'rsvp'
 COMMENTS_URI = 'comments'
 API_BASE_URL = 'http://api.meetup.com/'
 OAUTH_BASE_URL = 'http://www.meetup.com/'
@@ -70,6 +71,9 @@ class Meetup(object):
     def get_rsvps(self, **args):
         return API_Response(self._fetch(RSVPS_URI, **args), RSVPS_URI)
 
+    def post_rsvp(self, **args):
+        return self._post(RSVP_URI, **args)
+
     def get_cities(self, **args):
         return API_Response(self._fetch(CITIES_URI, **args), CITIES_URI) 
 
@@ -78,24 +82,35 @@ class Meetup(object):
 
     def get_comments(self, **args):
         return API_Response(self._fetch(COMMENTS_URI, **args), COMMENTS_URI) 
+    
+    def read(self, request):
+        try:
+            return request.read()
+        except HTTPError, e:
+            error_json = parse_json(e.read())
+            if e.code == 401:
+                raise UnauthorizedError(error_json)
+            elif e.code in ( 400, 500 ):
+                raise BadRequestError(error_json)
+            else:
+                raise ClientException(error_json)
 
-    def _fetch(self, uri, **url_args):
-        url_args['format'] = 'json'
+    def args_str(self, url_args):
         if self.api_key:
             url_args['key'] = self.api_key
-        args = urlencode(url_args)
+        return urlencode(url_args)
+
+    def _fetch(self, uri, **url_args):
+        args = self.args_str(url_args)
         url = API_BASE_URL + uri + '/' + "?" + args
         print "requesting %s" % (url)
-        try:
-           return parse_json(urlopen(url).read())
-        except HTTPError, e:
-           error_json = parse_json(e.read())
-           if e.code == 401:
-               raise UnauthorizedError(error_json)
-           elif e.code in ( 400, 500 ):
-               raise BadRequestError(error_json)
-           else:
-               raise ClientException(error_json)
+        return parse_json(self.read(urlopen(url)))
+
+    def _post(self, uri, **params):
+        args = self.args_str(params)
+        url = API_BASE_URL + uri + '/'
+        print "posting %s to %s" % (args, url)
+        return self.read(urlopen(url, data=args))
 
 class NoToken(Exception):
     def __init__(self, description):
@@ -153,7 +168,7 @@ class MeetupOAuth(Meetup):
             access_token = None
         return MeetupOAuthSession(self.consumer, request_token, access_token)
 
-    def _fetch(self, uri, sess=None, oauthreq=None, signature_method=signature_method_hmac, **url_args):
+    def _sign(self, uri, sess, oauthreq, signature_method, http_method='GET', **params):
         # the oauthreq parameter name is deprecated, please use sess or bind the session in __init__
         session = self.oauth_session or sess or oauthreq
         if not session:
@@ -161,25 +176,27 @@ class MeetupOAuth(Meetup):
         if not session.access_token:
             raise BadRequestError("Current MeetupOAuthSession does not have an access_token.")
         
-        url_args['format'] = 'json'
         oauth_access = oauth.OAuthRequest.from_consumer_and_token(self.consumer, 
+                                                                  http_method=http_method,
                                                                   token = session.access_token,
                                                                   http_url=API_BASE_URL + uri + "/",
-                                                                  parameters=url_args)
+                                                                  parameters=params)
         oauth_access.sign_request(signature_method, self.consumer, session.access_token)
+        return oauth_access
+
+    def _fetch(self, uri, sess=None, oauthreq=None, signature_method=signature_method_hmac, **url_args):
+        oauth_access = self._sign(uri, sess, oauthreq, signature_method, **url_args)
         url = oauth_access.to_url()
 
         print "requesting %s" % (url)
-        try:
-           return parse_json(urlopen(url).read())
-        except HTTPError, e:
-           error_json = parse_json(e.read())
-           if e.code == 401:
-               raise UnauthorizedError(error_json)
-           elif e.code == 500:
-               raise BadRequestError(error_json)
-           else:
-               raise ClientException(error_json)
+        return parse_json(self.read(urlopen(url)))
+
+    def _post(self, uri, sess=None, oauthreq=None, signature_method=signature_method_hmac, **params):
+        oauth_access = self._sign(uri, sess, oauthreq, signature_method, http_method='POST', **params)
+        url, data = oauth_access.get_normalized_http_url(), oauth_access.to_postdata()
+
+        print "posting %s to %s" % (data, url)
+        return self.read(urlopen(url, data=data))
 
 
 class API_Response(object):
