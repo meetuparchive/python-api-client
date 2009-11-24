@@ -149,7 +149,7 @@ class MeetupOAuth(Meetup):
             access_token = None
         return MeetupOAuthSession(self.consumer, request_token, access_token)
 
-    def _fetch(self, uri, sess=None, oauthreq=None, signature_method=signature_method_plaintext, **url_args):
+    def _fetch(self, uri, sess=None, oauthreq=None, signature_method=signature_method_hmac, **url_args):
         # the oauthreq parameter name is deprecated, please use sess or bind the session in __init__
         session = self.oauth_session or sess or oauthreq
         if not session:
