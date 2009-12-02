@@ -214,6 +214,14 @@ class MeetupOAuth(Meetup):
         print "posting %s to %s" % (data, url)
         return self.read(urlopen(url, data=data))
 
+    def _post_multipart(self, uri, sess=None, oauthreq=None, signature_method=signature_method_hmac, **params):
+        oauth_access = self._sign(uri, sess, oauthreq, signature_method, http_method='POST')
+        url, headers = oauth_access.get_normalized_http_url(), oauth_access.to_header()
+
+        opener = build_opener(mph.MultipartPostHandler)
+        print "posting multipart %s to %s" % (params, url)
+        return self.read(opener.open(Request(url, params, headers=headers)))
+
 
 class API_Response(object):
     def __init__(self, json, uritype):
