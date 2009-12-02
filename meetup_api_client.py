@@ -1,10 +1,13 @@
 #!/usr/bin/env python
+from __future__ import with_statement
 
 import datetime
-import oauth
 import time
 from urllib import urlencode
-from urllib2 import HTTPError, urlopen, Request
+from urllib2 import HTTPError, urlopen, Request, build_opener
+
+import oauth
+import MultipartPostHandler as mph
 
 # This is an example of a client wrapper that you can use to
 # make calls to the Meetup.com API. It requires that you have 
@@ -35,6 +38,8 @@ MEMBERS_URI = 'members'
 RSVPS_URI = 'rsvps'
 RSVP_URI = 'rsvp'
 COMMENTS_URI = 'comments'
+PHOTO_URI = 'photo'
+
 API_BASE_URL = 'http://api.meetup.com/'
 OAUTH_BASE_URL = 'http://www.meetup.com/'
 
@@ -83,6 +88,9 @@ class Meetup(object):
     def get_comments(self, **args):
         return API_Response(self._fetch(COMMENTS_URI, **args), COMMENTS_URI) 
     
+    def post_photo(self, **args):
+        return self._post_multipart(PHOTO_URI, **args)
+
     def read(self, request):
         try:
             return request.read()
@@ -111,6 +119,14 @@ class Meetup(object):
         url = API_BASE_URL + uri + '/'
         print "posting %s to %s" % (args, url)
         return self.read(urlopen(url, data=args))
+
+    def _post_multipart(self, uri, **params):
+        params['key'] = self.api_key
+
+        opener = build_opener(mph.MultipartPostHandler)
+        url = API_BASE_URL + uri + '/'
+        print "posting multipart %s to %s" % (params, url)
+        return self.read(opener.open(url, params))
 
 class NoToken(Exception):
     def __init__(self, description):
