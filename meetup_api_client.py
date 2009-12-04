@@ -248,6 +248,7 @@ class API_Item(object):
          """load properties that are relevant to all items (id, etc.)"""
          for field in self.datafields:
              self.__setattr__(field, properties[field])
+         self.json = properties
 
     def __repr__(self):
          return self.__str__();
@@ -263,7 +264,7 @@ class Member(API_Item):
         return "Member %s (url: %s)" % (self.name, self.link)
 
 class Photo(API_Item):
-    datafields = ['albumtitle', 'link', 'member_url', 'descr', 'created']
+    datafields = ['albumtitle', 'link', 'member_url', 'descr', 'created', 'photo_url', 'photo_urls', 'thumb_urls']
 
     def __str__(self):
         return "Photo located at %s posted by member at %s: (%s)" % (self.link, self.member_url, self.descr)
