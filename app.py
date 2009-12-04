@@ -3,9 +3,7 @@ from __future__ import with_statement
 
 """
     Simple, partial test of client. Obtains an access token for the given consumer
-    creditials. Note that the consumer may only be authorized once per user. If 
-    you'd like to test authorization again you must first remove the app
-    from your account:
+    credentials. The authorized application will appear on this page:
     http://www.meetup.com/account/oauth_apps/
 """
 
