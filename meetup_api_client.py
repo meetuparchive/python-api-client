@@ -287,7 +287,7 @@ class Rsvp(API_Item):
         return 'Rsvp by %s (%s) with comment: %s' % (self.name, self.link, self.comment)
 
 class Group(API_Item):
-    datafields = [ 'id','name','link','updated',\
+    datafields = [ 'id','name','group_urlname','link','updated',\
                    'members','created','photo_url',\
                    'description','zip','lat','lon',\
                    'city','state','country','organizerProfileURL', \
