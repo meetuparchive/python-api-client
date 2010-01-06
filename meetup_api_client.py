@@ -271,7 +271,7 @@ class Photo(API_Item):
 
 
 class Event(API_Item):
-    datafields = ['id', 'name', 'updated', 'time', 'photo_url', 'event_url', 'venue_lat', 'venue_lon', 'description', 'status']
+    datafields = ['id', 'name', 'updated', 'time', 'photo_url', 'event_url', 'venue_lat', 'venue_lon', 'description', 'status', 'rsvpcount', 'no_rsvpcount', 'maybe_rsvpcount']
 
     def __str__(self):
         return 'Event %s named %s at %s (url: %s)' % (self.id, self.name, self.time, self.event_url)
