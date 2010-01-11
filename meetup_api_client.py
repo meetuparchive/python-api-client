@@ -4,7 +4,7 @@ from __future__ import with_statement
 import datetime
 import time
 from urllib import urlencode
-from urllib2 import HTTPError, urlopen, Request, build_opener
+from urllib2 import HTTPError, HTTPErrorProcessor, urlopen, Request, build_opener
 
 import oauth
 import MultipartPostHandler as mph
@@ -55,7 +55,21 @@ signature_method_hmac = oauth.OAuthSignatureMethod_HMAC_SHA1()
 # TODO : parse the 'updated' into a real python date object with strptime()
 # TODO : add __str__ funcs for the objects that get created
 
+class MeetupHTTPErrorProcessor(HTTPErrorProcessor):
+    def http_response(self, request, response):
+        try:
+            return HTTPErrorProcessor.http_response(self, request, response)
+        except HTTPError, e:
+            error_json = parse_json(e.read())
+            if e.code == 401:
+                raise UnauthorizedError(error_json)
+            elif e.code in ( 400, 500 ):
+                raise BadRequestError(error_json)
+            else:
+                raise ClientException(error_json)
+
 class Meetup(object):
+    opener = build_opener(MeetupHTTPErrorProcessor)
     def __init__(self, api_key):
         """Initializes a new session with an api key that will be added
         to subsequent api calls"""
@@ -91,18 +105,6 @@ class Meetup(object):
     def post_photo(self, **args):
         return self._post_multipart(PHOTO_URI, **args)
 
-    def read(self, request):
-        try:
-            return request.read()
-        except HTTPError, e:
-            error_json = parse_json(e.read())
-            if e.code == 401:
-                raise UnauthorizedError(error_json)
-            elif e.code in ( 400, 500 ):
-                raise BadRequestError(error_json)
-            else:
-                raise ClientException(error_json)
-
     def args_str(self, url_args):
         if self.api_key:
             url_args['key'] = self.api_key
@@ -112,13 +114,13 @@ class Meetup(object):
         args = self.args_str(url_args)
         url = API_BASE_URL + uri + '/' + "?" + args
         print "requesting %s" % (url)
-        return parse_json(self.read(urlopen(url)))
+        return parse_json(Meetup.opener.open(url).read())
 
     def _post(self, uri, **params):
         args = self.args_str(params)
         url = API_BASE_URL + uri + '/'
         print "posting %s to %s" % (args, url)
-        return self.read(urlopen(url, data=args))
+        return Meetup.opener.open(url, data=args).read()
 
     def _post_multipart(self, uri, **params):
         params['key'] = self.api_key
@@ -126,7 +128,7 @@ class Meetup(object):
         opener = build_opener(mph.MultipartPostHandler)
         url = API_BASE_URL + uri + '/'
         print "posting multipart %s to %s" % (params, url)
-        return self.read(opener.open(url, params))
+        return opener.open(url, params).read()
 
 class NoToken(Exception):
     def __init__(self, description):
@@ -205,14 +207,14 @@ class MeetupOAuth(Meetup):
         url = oauth_access.to_url()
 
         print "requesting %s" % (url)
-        return parse_json(self.read(urlopen(url)))
+        return parse_json(Meetup.opener.open(url).read())
 
     def _post(self, uri, sess=None, oauthreq=None, signature_method=signature_method_hmac, **params):
         oauth_access = self._sign(uri, sess, oauthreq, signature_method, http_method='POST', **params)
         url, data = oauth_access.get_normalized_http_url(), oauth_access.to_postdata()
 
         print "posting %s to %s" % (data, url)
-        return self.read(urlopen(url, data=data))
+        return Meetup.opener.open(url, data=data).read()
 
     def _post_multipart(self, uri, sess=None, oauthreq=None, signature_method=signature_method_hmac, **params):
         oauth_access = self._sign(uri, sess, oauthreq, signature_method, http_method='POST')
@@ -220,7 +222,7 @@ class MeetupOAuth(Meetup):
 
         opener = build_opener(mph.MultipartPostHandler)
         print "posting multipart %s to %s" % (params, url)
-        return self.read(opener.open(Request(url, params, headers=headers)))
+        return opener.open(Request(url, params, headers=headers)).read()
 
 
 class API_Response(object):
