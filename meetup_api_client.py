@@ -3,6 +3,7 @@ from __future__ import with_statement
 
 import datetime
 import time
+import types
 from urllib import urlencode
 from urllib2 import HTTPError, HTTPErrorProcessor, urlopen, Request, build_opener
 
@@ -29,15 +30,7 @@ try:
 except:
     print "Error - your system is missing support for a JSON parsing library."
 
-GROUPS_URI = 'groups'
-EVENTS_URI = 'events'
-CITIES_URI = 'cities'
-TOPICS_URI = 'topics'
-PHOTOS_URI = 'photos'
-MEMBERS_URI = 'members'
-RSVPS_URI = 'rsvps'
 RSVP_URI = 'rsvp'
-COMMENTS_URI = 'comments'
 PHOTO_URI = 'photo'
 
 API_BASE_URL = 'http://api.meetup.com/'
@@ -75,33 +68,9 @@ class Meetup(object):
         to subsequent api calls"""
         self.api_key = api_key
 
-    def get_groups(self, **args):
-        return API_Response(self._fetch(GROUPS_URI, **args), GROUPS_URI)
- 
-    def get_events(self, **args):
-        return API_Response(self._fetch(EVENTS_URI, **args), EVENTS_URI) 
-
-    def get_photos(self, **args):
-        return API_Response(self._fetch(PHOTOS_URI, **args), PHOTOS_URI)
-    
-    def get_topics(self, **args):
-        return API_Response(self._fetch(TOPICS_URI, **args), TOPICS_URI)
-
-    def get_rsvps(self, **args):
-        return API_Response(self._fetch(RSVPS_URI, **args), RSVPS_URI)
-
     def post_rsvp(self, **args):
         return self._post(RSVP_URI, **args)
 
-    def get_cities(self, **args):
-        return API_Response(self._fetch(CITIES_URI, **args), CITIES_URI) 
-
-    def get_members(self, **args):
-        return API_Response(self._fetch(MEMBERS_URI, **args), MEMBERS_URI) 
-
-    def get_comments(self, **args):
-        return API_Response(self._fetch(COMMENTS_URI, **args), COMMENTS_URI) 
-    
     def post_photo(self, **args):
         return self._post_multipart(PHOTO_URI, **args)
 
@@ -129,6 +98,17 @@ class Meetup(object):
         url = API_BASE_URL + uri + '/'
         print "posting multipart %s to %s" % (params, url)
         return opener.open(url, params).read()
+
+"""Add read methods to Meetup class dynamically (avoiding boilerplate)"""
+READ_METHODS = ['groups', 'events', 'topics', 'cities', 'members', 'rsvps',
+                'photos', 'comments', 'activity']
+def _generate_read_method(name):
+    def read_method(self, **args):
+        return self._fetch(name, **args)
+    return read_method
+for method in READ_METHODS:
+    read_method = types.MethodType(_generate_read_method(method), None, Meetup)
+    setattr(Meetup, 'get_' + method, read_method)
 
 class NoToken(Exception):
     def __init__(self, description):
