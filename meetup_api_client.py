@@ -30,7 +30,15 @@ try:
 except:
     print "Error - your system is missing support for a JSON parsing library."
 
+GROUPS_URI = 'groups'
+EVENTS_URI = 'events'
+CITIES_URI = 'cities'
+TOPICS_URI = 'topics'
+PHOTOS_URI = 'photos'
+MEMBERS_URI = 'members'
+RSVPS_URI = 'rsvps'
 RSVP_URI = 'rsvp'
+COMMENTS_URI = 'comments'
 PHOTO_URI = 'photo'
 
 API_BASE_URL = 'http://api.meetup.com/'
