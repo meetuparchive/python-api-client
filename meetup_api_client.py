@@ -112,7 +112,7 @@ READ_METHODS = ['groups', 'events', 'topics', 'cities', 'members', 'rsvps',
                 'photos', 'comments', 'activity']
 def _generate_read_method(name):
     def read_method(self, **args):
-        return self._fetch(name, **args)
+        return API_Response(self._fetch(name, **args), name)
     return read_method
 for method in READ_METHODS:
     read_method = types.MethodType(_generate_read_method(method), None, Meetup)
