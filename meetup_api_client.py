@@ -91,13 +91,13 @@ class Meetup(object):
         args = self.args_str(url_args)
         url = API_BASE_URL + uri + '/' + "?" + args
         print "requesting %s" % (url)
-        return parse_json(Meetup.opener.open(url).read())
+        return parse_json(self.opener.open(url).read())
 
     def _post(self, uri, **params):
         args = self.args_str(params)
         url = API_BASE_URL + uri + '/'
         print "posting %s to %s" % (args, url)
-        return Meetup.opener.open(url, data=args).read()
+        return self.opener.open(url, data=args).read()
 
     def _post_multipart(self, uri, **params):
         params['key'] = self.api_key
@@ -196,14 +196,14 @@ class MeetupOAuth(Meetup):
         url = oauth_access.to_url()
 
         print "requesting %s" % (url)
-        return parse_json(Meetup.opener.open(url).read())
+        return parse_json(self.opener.open(url).read())
 
     def _post(self, uri, sess=None, oauthreq=None, signature_method=signature_method_hmac, **params):
         oauth_access = self._sign(uri, sess, oauthreq, signature_method, http_method='POST', **params)
         url, data = oauth_access.get_normalized_http_url(), oauth_access.to_postdata()
 
         print "posting %s to %s" % (data, url)
-        return Meetup.opener.open(url, data=data).read()
+        return self.opener.open(url, data=data).read()
 
     def _post_multipart(self, uri, sess=None, oauthreq=None, signature_method=signature_method_hmac, **params):
         oauth_access = self._sign(uri, sess, oauthreq, signature_method, http_method='POST')
