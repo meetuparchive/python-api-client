@@ -172,6 +172,7 @@ class MeetupOAuth(Meetup):
         self.oauth_consumer_key = oauth_consumer_key
         self.oauth_consumer_secret = oauth_consumer_secret
         self.consumer = oauth.OAuthConsumer(self.oauth_consumer_key, self.oauth_consumer_secret)
+        self.oauth_session = None
         if access_key and access_secret:
             self.oauth_session = self.new_session(access_key=access_key, access_secret=access_secret)
 
