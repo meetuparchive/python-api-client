@@ -14,6 +14,7 @@ from meetup_api_client import *
 
 from optparse import OptionParser
 import webbrowser
+import sys
 
 def config_client(config_name=None):
     return get_client(get_config(config_name)[1])
@@ -77,6 +78,8 @@ if __name__ == '__main__':
         access_granted()
     else:
         if config.has_section('request'):
+            if not options.verifier:
+                sys.exit("To complete the process you must supply a --verifier")
             request_key, request_secret = get_token(config, 'request')
             oauth_session = mucli.new_session(request_key=request_key, request_secret=request_secret)
             oauth_session.fetch_access_token(options.verifier)
