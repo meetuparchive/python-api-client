@@ -67,7 +67,7 @@ if __name__ == '__main__':
     mucli = get_client(config)
     
     def access_granted():
-        print """
+        print """\
     access-key:     %s
     accses-secret:  %s
     
@@ -82,7 +82,7 @@ if __name__ == '__main__':
                 sys.exit("To complete the process you must supply a --verifier")
             request_key, request_secret = get_token(config, 'request')
             oauth_session = mucli.new_session(request_key=request_key, request_secret=request_secret)
-            oauth_session.fetch_access_token(options.verifier)
+            print "    member_id:      %s" % oauth_session.fetch_access_token(options.verifier)
             set_token(config, 'access', oauth_session.access_token.key, oauth_session.access_token.secret)
             access_granted()
         else:

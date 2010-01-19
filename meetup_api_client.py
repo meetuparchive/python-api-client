@@ -3,6 +3,7 @@ from __future__ import with_statement
 
 import datetime
 import time
+import cgi
 from urllib import urlencode
 from urllib2 import HTTPError, HTTPErrorProcessor, urlopen, Request, build_opener
 
@@ -167,6 +168,7 @@ class MeetupOAuthSession:
         oauth_req.sign_request(signature_method, self.consumer, temp_request_token)
         token_string = urlopen(Request(oauth_req.http_url, headers=oauth_req.to_header())).read()
         self.access_token = oauth.OAuthToken.from_string(token_string)
+        return cgi.parse_qs(token_string)['member_id'][0]
 
 class MeetupOAuth(Meetup):
 
