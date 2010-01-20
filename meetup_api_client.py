@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 from __future__ import with_statement
 
-import datetime
 import time
 import cgi
+import types
 from urllib import urlencode
 from urllib2 import HTTPError, HTTPErrorProcessor, urlopen, Request, build_opener
+from datetime import datetime
 
 import oauth
 import MultipartPostHandler as mph
@@ -76,33 +77,9 @@ class Meetup(object):
         to subsequent api calls"""
         self.api_key = api_key
 
-    def get_groups(self, **args):
-        return API_Response(self._fetch(GROUPS_URI, **args), GROUPS_URI)
- 
-    def get_events(self, **args):
-        return API_Response(self._fetch(EVENTS_URI, **args), EVENTS_URI) 
-
-    def get_photos(self, **args):
-        return API_Response(self._fetch(PHOTOS_URI, **args), PHOTOS_URI)
-    
-    def get_topics(self, **args):
-        return API_Response(self._fetch(TOPICS_URI, **args), TOPICS_URI)
-
-    def get_rsvps(self, **args):
-        return API_Response(self._fetch(RSVPS_URI, **args), RSVPS_URI)
-
     def post_rsvp(self, **args):
         return self._post(RSVP_URI, **args)
 
-    def get_cities(self, **args):
-        return API_Response(self._fetch(CITIES_URI, **args), CITIES_URI) 
-
-    def get_members(self, **args):
-        return API_Response(self._fetch(MEMBERS_URI, **args), MEMBERS_URI) 
-
-    def get_comments(self, **args):
-        return API_Response(self._fetch(COMMENTS_URI, **args), COMMENTS_URI) 
-    
     def post_photo(self, **args):
         return self._post_multipart(PHOTO_URI, **args)
 
@@ -115,13 +92,13 @@ class Meetup(object):
         args = self.args_str(url_args)
         url = API_BASE_URL + uri + '/' + "?" + args
         print "requesting %s" % (url)
-        return parse_json(Meetup.opener.open(url).read())
+        return parse_json(self.opener.open(url).read())
 
     def _post(self, uri, **params):
         args = self.args_str(params)
         url = API_BASE_URL + uri + '/'
         print "posting %s to %s" % (args, url)
-        return Meetup.opener.open(url, data=args).read()
+        return self.opener.open(url, data=args).read()
 
     def _post_multipart(self, uri, **params):
         params['key'] = self.api_key
@@ -130,6 +107,17 @@ class Meetup(object):
         url = API_BASE_URL + uri + '/'
         print "posting multipart %s to %s" % (params, url)
         return opener.open(url, params).read()
+
+"""Add read methods to Meetup class dynamically (avoiding boilerplate)"""
+READ_METHODS = ['groups', 'events', 'topics', 'cities', 'members', 'rsvps',
+                'photos', 'comments', 'activity']
+def _generate_read_method(name):
+    def read_method(self, **args):
+        return API_Response(self._fetch(name, **args), name)
+    return read_method
+for method in READ_METHODS:
+    read_method = types.MethodType(_generate_read_method(method), None, Meetup)
+    setattr(Meetup, 'get_' + method, read_method)
 
 class NoToken(Exception):
     def __init__(self, description):
@@ -212,14 +200,14 @@ class MeetupOAuth(Meetup):
         url = oauth_access.to_url()
 
         print "requesting %s" % (url)
-        return parse_json(Meetup.opener.open(url).read())
+        return parse_json(self.opener.open(url).read())
 
     def _post(self, uri, sess=None, oauthreq=None, signature_method=signature_method_hmac, **params):
         oauth_access = self._sign(uri, sess, oauthreq, signature_method, http_method='POST', **params)
         url, data = oauth_access.get_normalized_http_url(), oauth_access.to_postdata()
 
         print "posting %s to %s" % (data, url)
-        return Meetup.opener.open(url, data=data).read()
+        return self.opener.open(url, data=data).read()
 
     def _post_multipart(self, uri, sess=None, oauthreq=None, signature_method=signature_method_hmac, **params):
         oauth_access = self._sign(uri, sess, oauthreq, signature_method, http_method='POST')
@@ -247,21 +235,31 @@ class API_Response(object):
     def __str__(self):
         return 'meta: ' + str(self.meta) + '\n' + str(self.results)
 
+def converttime(str):
+    """Given a time string in Meetup's format, return a datetime."""
+    MEETUP_DATE_FORMAT = '%a %b %d %H:%M:%S %Z %Y'
+    return datetime.strptime(str, MEETUP_DATE_FORMAT)
+
 class API_Item(object):
     """Base class for an item in a result set returned by the API."""
 
     datafields = [] #override
+    timefields = [] #override
     def __init__(self, properties):
-         """load properties that are relevant to all items (id, etc.)"""
-         for field in self.datafields:
-             self.__setattr__(field, properties[field])
-         self.json = properties
+        """load properties that are relevant to all items (id, etc.)"""
+        for field in self.datafields:
+            self.__setattr__(field, properties[field])
+        for field in self.timefields:
+            self.__setattr__(field, converttime(properties[field]))
+        self.json = properties
 
     def __repr__(self):
          return self.__str__();
 
 class Member(API_Item):
-    datafields = ['bio', 'name', 'link','id','photo_url', 'zip','lat','lon','city','state','country','joined','visited']
+    datafields = ['bio', 'name', 'link','id','photo_url', 'zip','lat','lon',
+                  'city','state','country']
+    timefields = ['joined', 'visited']
     
     def get_groups(self, apiclient, **extraparams):
         extraparams.update({'member_id':self.id})
@@ -271,14 +269,19 @@ class Member(API_Item):
         return "Member %s (url: %s)" % (self.name, self.link)
 
 class Photo(API_Item):
-    datafields = ['albumtitle', 'link', 'member_url', 'descr', 'created', 'photo_url', 'photo_urls', 'thumb_urls']
+    datafields = ['albumtitle', 'link', 'member_url', 'descr', 'photo_url',
+                  'photo_urls', 'thumb_urls']
+    timefields = ['created']
 
     def __str__(self):
         return "Photo located at %s posted by member at %s: (%s)" % (self.link, self.member_url, self.descr)
 
 
 class Event(API_Item):
-    datafields = ['id', 'name', 'updated', 'time', 'photo_url', 'event_url', 'venue_lat', 'venue_lon', 'description', 'status', 'rsvpcount', 'no_rsvpcount', 'maybe_rsvpcount']
+    datafields = ['id', 'name', 'photo_url', 'event_url', 'venue_lat',
+                  'venue_lon', 'description', 'status', 'rsvpcount',
+                  'no_rsvpcount', 'maybe_rsvpcount']
+    timefields = ['time', 'updated']
 
     def __str__(self):
         return 'Event %s named %s at %s (url: %s)' % (self.id, self.name, self.time, self.event_url)
@@ -288,17 +291,18 @@ class Event(API_Item):
         return apiclient.get_rsvps(**extraparams)
 
 class Rsvp(API_Item):
-    datafields = ['name', 'link', 'comment','zip','coord','lon','city','state','country','response','guests','answers','updated','created']
+    datafields = ['name', 'link', 'comment','zip','coord','lon','city','state',
+                  'country','response','guests','answers']
+    timefields = ['updated', 'created']
 
     def __str__(self):
         return 'Rsvp by %s (%s) with comment: %s' % (self.name, self.link, self.comment)
 
 class Group(API_Item):
-    datafields = [ 'id','name','group_urlname','link','updated',\
-                   'members','created','photo_url',\
-                   'description','zip','lat','lon',\
-                   'city','state','country','organizerProfileURL', \
-                   'topics']
+    datafields = [ 'id','name','group_urlname','link', 'members','photo_url',
+                   'description','zip','lat','lon', 'city','state','country',
+                   'organizerProfileURL', 'topics']
+    timefields = ['created', 'updated']
     
     def __str__(self):
          return "%s (%s)" % (self.name, self.link)
@@ -332,8 +336,8 @@ class City(API_Item):
         return apiclient.get_events(**extraparams) 
 
 class Topic(API_Item):
-    datafields = ['id','name','description','link','updated',\
-                  'members','urlkey']
+    datafields = ['id','name','description','link', 'members','urlkey']
+    timefields = ['updated']
     
     def __str__(self):
          return "%s with %s members (%s)" % (self.name, self.members,
@@ -348,8 +352,9 @@ class Topic(API_Item):
          return apiclient.get_photos(**extraparams)
 
 class Comment(API_Item):
-    datafields = ['name','link','comment','rating','photo_url',\
-                  'created','lat','lon','country','city','state']
+    datafields = ['name','link','comment','rating','photo_url',
+                  'lat','lon','country','city','state']
+    timefields = ['created']
     
     def __str__(self):
          return "Comment from %s (%s)" % (self.name, self.link)
