@@ -14,6 +14,7 @@ from meetup_api_client import *
 
 from optparse import OptionParser
 import webbrowser
+import sys
 
 def config_client(config_name=None):
     return get_client(get_config(config_name)[1])
@@ -49,6 +50,10 @@ if __name__ == '__main__':
     option = OptionParser('%prog [options] [consumer-key] [consumer-secret]')
     option.add_option('--config', dest='config', 
         help='read & write settings to CONFIG, default is app.cfg')
+    option.add_option('--verifier', dest='verifier', 
+        help='oauth_callback for request-token request, defaults to oob')
+    option.add_option('--callback', dest='callback', default='oob',
+        help='oauth_verifier, required to gain access token')
     (options, args) = option.parse_args()
     
     config_name, config = get_config(options.config)
@@ -62,7 +67,7 @@ if __name__ == '__main__':
     mucli = get_client(config)
     
     def access_granted():
-        print """
+        print """\
     access-key:     %s
     accses-secret:  %s
     
@@ -73,14 +78,16 @@ if __name__ == '__main__':
         access_granted()
     else:
         if config.has_section('request'):
+            if not options.verifier:
+                sys.exit("To complete the process you must supply a --verifier")
             request_key, request_secret = get_token(config, 'request')
             oauth_session = mucli.new_session(request_key=request_key, request_secret=request_secret)
-            oauth_session.fetch_access_token()
+            print "    member_id:      %s" % oauth_session.fetch_access_token(options.verifier)
             set_token(config, 'access', oauth_session.access_token.key, oauth_session.access_token.secret)
             access_granted()
         else:
             oauth_session = mucli.new_session()
-            oauth_session.fetch_request_token()
+            oauth_session.fetch_request_token(callback=options.callback)
         
             set_token(config, 'request', oauth_session.request_token.key, oauth_session.request_token.secret)
 
