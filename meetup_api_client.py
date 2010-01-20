@@ -262,7 +262,10 @@ class Photo(API_Item):
 
 
 class Event(API_Item):
-    datafields = ['id', 'name', 'updated', 'time', 'photo_url', 'event_url', 'venue_lat', 'venue_lon', 'description', 'status', 'rsvpcount', 'no_rsvpcount', 'maybe_rsvpcount']
+    datafields = ['id', 'name', 'updated', 'time', 'photo_url', 'event_url', 'description', 'status', \
+        'rsvpcount', 'no_rsvpcount', 'maybe_rsvpcount', \
+        'venue_id', 'venue_name', 'venue_phone', 'venue_address1', 'venue_address3', 'venue_address2', 'venue_city', 'venue_state', 'venue_zip', \
+        'venue_map', 'venue_lat', 'venue_lon']
 
     def __str__(self):
         return 'Event %s named %s at %s (url: %s)' % (self.id, self.name, self.time, self.event_url)
@@ -332,7 +335,7 @@ class Topic(API_Item):
          return apiclient.get_photos(**extraparams)
 
 class Comment(API_Item):
-    datafields = ['name','link','comment','rating','photo_url',\
+    datafields = ['name','link','comment','photo_url',\
                   'created','lat','lon','country','city','state']
     
     def __str__(self):
