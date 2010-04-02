@@ -75,12 +75,6 @@ if __name__ == '__main__':
               """ % get_token(config, 'access')
 
     if config.has_section('access'):
-        # test mpoauth's creative "refresh" behavior
-        access_key, access_secret = get_token(config, 'access')
-        oauth_session = mucli.new_session(request_key=access_key, request_secret=access_secret)
-        print "    member_id:      %s" % oauth_session.fetch_access_token("")
-        assert access_key == oauth_session.access_token.key
-        assert access_secret == oauth_session.access_token.secret
         access_granted()
     else:
         if config.has_section('request'):
