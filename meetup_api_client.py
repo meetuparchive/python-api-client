@@ -135,7 +135,7 @@ class MeetupOAuthSession:
 
     def fetch_request_token(self, callback="oob", signature_method=signature_method_hmac):
         oauth_req = oauth.OAuthRequest.from_consumer_and_token(
-            self.consumer, http_url=(OAUTH_BASE_URL + 'oauth/request/'), callback=callback)
+            self.consumer, http_url=(OAUTH_BASE_URL + 'oauth/request'), callback=callback)
         oauth_req.sign_request(signature_method, self.consumer, None)
         token_string = urlopen(Request(oauth_req.http_url, headers=oauth_req.to_header())).read()
         self.request_token = oauth.OAuthToken.from_string(token_string)
@@ -145,14 +145,14 @@ class MeetupOAuthSession:
             callbackUrl = "&" + urlencode({"oauth_callback":oauth_callback})
         else:
             callbackUrl = ""
-        return OAUTH_BASE_URL + "authorize/?oauth_token=%s%s" % (self.request_token.key, callbackUrl)
+        return OAUTH_BASE_URL + "authorize?oauth_token=%s%s" % (self.request_token.key, callbackUrl)
 
     def fetch_access_token(self, oauth_verifier, signature_method=signature_method_hmac, request_token=None):
         temp_request_token = request_token or self.request_token
         if not temp_request_token:
             raise NoToken("You must provide a request token to exchange for an access token")
         oauth_req = oauth.OAuthRequest.from_consumer_and_token(self.consumer, token=temp_request_token, 
-            http_url=OAUTH_BASE_URL + 'oauth/access/', verifier=oauth_verifier)
+            http_url=OAUTH_BASE_URL + 'oauth/access', verifier=oauth_verifier)
         oauth_req.sign_request(signature_method, self.consumer, temp_request_token)
         token_string = urlopen(Request(oauth_req.http_url, headers=oauth_req.to_header())).read()
         self.access_token = oauth.OAuthToken.from_string(token_string)
