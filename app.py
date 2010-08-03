@@ -54,6 +54,8 @@ if __name__ == '__main__':
         help='oauth_callback for request-token request, defaults to oob')
     option.add_option('--callback', dest='callback', default='oob',
         help='oauth_verifier, required to gain access token')
+    option.add_option('--authenticate', dest='authenticate', action='store_true',
+        help='pass in to use authentication end point')
     (options, args) = option.parse_args()
     
     config_name, config = get_config(options.config)
@@ -91,7 +93,10 @@ if __name__ == '__main__':
         
             set_token(config, 'request', oauth_session.request_token.key, oauth_session.request_token.secret)
 
-            url = oauth_session.get_authorize_url()
+            if (options.authenticate):
+                url = oauth_session.get_authenticate_url()
+            else:
+                url = oauth_session.get_authorize_url()
             print "Opening a browser on the authorization page: %s" % url
             webbrowser.open(url)
         
