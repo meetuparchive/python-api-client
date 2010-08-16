@@ -42,6 +42,7 @@ RSVPS_URI = 'rsvps'
 RSVP_URI = 'rsvp'
 COMMENTS_URI = 'comments'
 PHOTO_URI = 'photo'
+MEMBER_PHOTO_URI = '2/member_photo'
 
 API_BASE_URL = 'http://api.meetup.com/'
 OAUTH_BASE_URL = 'http://www.meetup.com/'
@@ -83,6 +84,9 @@ class Meetup(object):
 
     def post_photo(self, **args):
         return self._post_multipart(PHOTO_URI, **args)
+
+    def post_member_photo(self, **args):
+        return self._post_multipart(MEMBER_PHOTO_URI, **args)
 
     def args_str(self, url_args):
         if self.api_key:
