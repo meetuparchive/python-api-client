@@ -16,7 +16,7 @@ import MultipartPostHandler as mph
 # make calls to the Meetup.com API. It requires that you have 
 # a JSON parsing module available.
 
-API_JSON_ENCODING = 'ISO-8859-1'
+API_JSON_ENCODING = 'utf-8'
 
 try:
     try:
@@ -78,6 +78,7 @@ class Meetup(object):
         """Initializes a new session with an api key that will be added
         to subsequent api calls"""
         self.api_key = api_key
+        self.opener.addheaders = [('Accept-Charset', 'utf-8')]
 
     def post_rsvp(self, **args):
         return self._post(RSVP_URI, **args)
