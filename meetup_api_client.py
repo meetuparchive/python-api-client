@@ -63,7 +63,14 @@ class MeetupHTTPErrorProcessor(HTTPErrorProcessor):
         try:
             return HTTPErrorProcessor.http_response(self, request, response)
         except HTTPError, e:
-            error_json = parse_json(e.read())
+            data = e.read()
+
+            try:
+                error_json = parse_json(data)
+            except ValueError:
+                logging.debug('Value error when trying to parse JSON from response data:\n%s' % response)
+                raise
+
             if e.code == 401:
                 raise UnauthorizedError(error_json)
             elif e.code in ( 400, 500 ):
@@ -73,6 +80,10 @@ class MeetupHTTPErrorProcessor(HTTPErrorProcessor):
 
 class Meetup(object):
     opener = build_opener(MeetupHTTPErrorProcessor)
+    # Act like a real browser or else CloudFlare protection
+    # blocks the request as banned
+    opener.addheaders = [('User-Agent', 'Mozilla/5.0')]
+
     def __init__(self, api_key):
         """Initializes a new session with an api key that will be added
         to subsequent api calls"""
