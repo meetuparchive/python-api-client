@@ -45,7 +45,10 @@ PHOTO_URI = '2/photo'
 MEMBER_PHOTO_URI = '2/member_photo'
 
 API_BASE_URL = 'http://api.meetup.com/'
-OAUTH_BASE_URL = 'http://www.meetup.com/'
+
+OAUTH_REQUEST_URL = 'https://api.meetup.com/oauth/request/'
+OAUTH_AUTHORIZE_URL = 'http://www.meetup.com/authorize/'
+OAUTH_ACCESS_URL = 'https://api.meetup.com/oauth/access/'
 
 signature_method_plaintext = oauth.OAuthSignatureMethod_PLAINTEXT()
 signature_method_hmac = oauth.OAuthSignatureMethod_HMAC_SHA1()
@@ -160,7 +163,7 @@ class MeetupOAuthSession:
 
     def fetch_request_token(self, callback="oob", signature_method=signature_method_hmac):
         oauth_req = oauth.OAuthRequest.from_consumer_and_token(
-            self.consumer, http_url=(OAUTH_BASE_URL + 'oauth/request/'), callback=callback)
+            self.consumer, http_url=OAUTH_REQUEST_URL, callback=callback)
         oauth_req.sign_request(signature_method, self.consumer, None)
         token_string = urlopen(Request(oauth_req.http_url, headers=oauth_req.to_header())).read()
         self.request_token = oauth.OAuthToken.from_string(token_string)
@@ -170,7 +173,7 @@ class MeetupOAuthSession:
             callbackUrl = "&" + urlencode({"oauth_callback":oauth_callback})
         else:
             callbackUrl = ""
-        return OAUTH_BASE_URL + "authorize/?oauth_token=%s%s" % (self.request_token.key, callbackUrl)
+        return OAUTH_AUTHORIZE_URL + "?oauth_token=%s%s" % (self.request_token.key, callbackUrl)
 
     def get_authenticate_url(self, oauth_callback=None):
         if oauth_callback:
@@ -184,7 +187,7 @@ class MeetupOAuthSession:
         if not temp_request_token:
             raise NoToken("You must provide a request token to exchange for an access token")
         oauth_req = oauth.OAuthRequest.from_consumer_and_token(self.consumer, token=temp_request_token, 
-            http_url=OAUTH_BASE_URL + 'oauth/access/', verifier=oauth_verifier)
+            http_url=OAUTH_ACCESS_URL, verifier=oauth_verifier)
         oauth_req.sign_request(signature_method, self.consumer, temp_request_token)
         token_string = urlopen(Request(oauth_req.http_url, headers=oauth_req.to_header())).read()
         self.access_token = oauth.OAuthToken.from_string(token_string)
