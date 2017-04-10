@@ -43,6 +43,7 @@ RSVP_URI = '2/rsvp'
 COMMENTS_URI = 'comments'
 PHOTO_URI = '2/photo'
 MEMBER_PHOTO_URI = '2/member_photo'
+FIND_GROUPS_URI = 'find/groups'
 
 API_BASE_URL = 'http://api.meetup.com/'
 
@@ -102,6 +103,9 @@ class Meetup(object):
     def post_member_photo(self, **args):
         return self._post_multipart(MEMBER_PHOTO_URI, **args)
 
+    def find_groups(self, **args):
+        return self._fetch(FIND_GROUPS_URI, **args)
+
     def args_str(self, url_args):
         if self.api_key:
             url_args['key'] = self.api_key
@@ -110,6 +114,7 @@ class Meetup(object):
     def _fetch(self, uri, **url_args):
         args = self.args_str(url_args)
         url = API_BASE_URL + uri + '/' + "?" + args
+
         logging.debug("requesting %s" % (url))
         return parse_json(self.opener.open(url).read())
 
