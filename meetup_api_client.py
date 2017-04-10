@@ -32,21 +32,23 @@ try:
 except:
     print "Error - your system is missing support for a JSON parsing library."
 
-GROUPS_URI = 'groups'
-EVENTS_URI = 'events'
-CITIES_URI = 'cities'
+GROUPS_URI = '2/groups'
+EVENTS_URI = '2/events'
 TOPICS_URI = 'topics'
-PHOTOS_URI = 'photos'
-MEMBERS_URI = 'members'
-RSVPS_URI = 'rsvps'
-RSVP_URI = 'rsvp'
+CITIES_URI = '2/cities'
+MEMBERS_URI = '2/members'
+RSVPS_URI = '2/rsvps'
+PHOTOS_URI = '2/photos'
+RSVP_URI = '2/rsvp'
 COMMENTS_URI = 'comments'
-PHOTO_URI = 'photo'
+PHOTO_URI = '2/photo'
 MEMBER_PHOTO_URI = '2/member_photo'
 
 API_BASE_URL = 'http://api.meetup.com/'
-OAUTH_BASE_URL = 'http://www.meetup.com/'
 
+OAUTH_REQUEST_URL = 'https://api.meetup.com/oauth/request/'
+OAUTH_AUTHORIZE_URL = 'http://www.meetup.com/authorize/'
+OAUTH_ACCESS_URL = 'https://api.meetup.com/oauth/access/'
 
 signature_method_plaintext = oauth.OAuthSignatureMethod_PLAINTEXT()
 signature_method_hmac = oauth.OAuthSignatureMethod_HMAC_SHA1()
@@ -64,7 +66,14 @@ class MeetupHTTPErrorProcessor(HTTPErrorProcessor):
         try:
             return HTTPErrorProcessor.http_response(self, request, response)
         except HTTPError, e:
-            error_json = parse_json(e.read())
+            data = e.read()
+
+            try:
+                error_json = parse_json(data)
+            except ValueError:
+                logging.debug('Value error when trying to parse JSON from response data:\n%s' % response)
+                raise
+
             if e.code == 401:
                 raise UnauthorizedError(error_json)
             elif e.code in ( 400, 500 ):
@@ -74,6 +83,10 @@ class MeetupHTTPErrorProcessor(HTTPErrorProcessor):
 
 class Meetup(object):
     opener = build_opener(MeetupHTTPErrorProcessor)
+    # Act like a real browser or else CloudFlare protection
+    # blocks the request as banned
+    opener.addheaders = [('User-Agent', 'Mozilla/5.0')]
+
     def __init__(self, api_key):
         """Initializes a new session with an api key that will be added
         to subsequent api calls"""
@@ -115,14 +128,23 @@ class Meetup(object):
         return opener.open(url, params).read()
 
 """Add read methods to Meetup class dynamically (avoiding boilerplate)"""
-READ_METHODS = ['groups', 'events', 'topics', 'cities', 'members', 'rsvps',
-                'photos', 'comments', 'activity']
+READ_METHODS = { 
+        'groups': '2/groups', 
+        'events': '2/events', 
+        'topics': 'topics', 
+        'cities': '2/cities', 
+        'members': '2/members', 
+        'rsvps': '2/rsvps',
+        'photos': '2/photos', 
+        'comments': 'comments', 
+        'activity': 'activity',
+        }
 def _generate_read_method(name):
     def read_method(self, **args):
         return API_Response(self._fetch(name, **args), name)
     return read_method
-for method in READ_METHODS:
-    read_method = types.MethodType(_generate_read_method(method), None, Meetup)
+for method, uri in READ_METHODS.items():
+    read_method = types.MethodType(_generate_read_method(uri), None, Meetup)
     setattr(Meetup, 'get_' + method, read_method)
 
 class NoToken(Exception):
@@ -141,7 +163,7 @@ class MeetupOAuthSession:
 
     def fetch_request_token(self, callback="oob", signature_method=signature_method_hmac):
         oauth_req = oauth.OAuthRequest.from_consumer_and_token(
-            self.consumer, http_url=(OAUTH_BASE_URL + 'oauth/request/'), callback=callback)
+            self.consumer, http_url=OAUTH_REQUEST_URL, callback=callback)
         oauth_req.sign_request(signature_method, self.consumer, None)
         token_string = urlopen(Request(oauth_req.http_url, headers=oauth_req.to_header())).read()
         self.request_token = oauth.OAuthToken.from_string(token_string)
@@ -151,7 +173,7 @@ class MeetupOAuthSession:
             callbackUrl = "&" + urlencode({"oauth_callback":oauth_callback})
         else:
             callbackUrl = ""
-        return OAUTH_BASE_URL + "authorize/?oauth_token=%s%s" % (self.request_token.key, callbackUrl)
+        return OAUTH_AUTHORIZE_URL + "?oauth_token=%s%s" % (self.request_token.key, callbackUrl)
 
     def get_authenticate_url(self, oauth_callback=None):
         if oauth_callback:
@@ -165,7 +187,7 @@ class MeetupOAuthSession:
         if not temp_request_token:
             raise NoToken("You must provide a request token to exchange for an access token")
         oauth_req = oauth.OAuthRequest.from_consumer_and_token(self.consumer, token=temp_request_token, 
-            http_url=OAUTH_BASE_URL + 'oauth/access/', verifier=oauth_verifier)
+            http_url=OAUTH_ACCESS_URL, verifier=oauth_verifier)
         oauth_req.sign_request(signature_method, self.consumer, temp_request_token)
         token_string = urlopen(Request(oauth_req.http_url, headers=oauth_req.to_header())).read()
         self.access_token = oauth.OAuthToken.from_string(token_string)
@@ -255,14 +277,21 @@ class API_Item(object):
     def __init__(self, properties):
          """load properties that are relevant to all items (id, etc.)"""
          for field in self.datafields:
-             self.__setattr__(field, properties[field])
+             # Not all fields are required to be returned
+             if properties.has_key(field):
+                self.__setattr__(field, properties[field])
          self.json = properties
 
     def __repr__(self):
          return self.__str__();
 
 class Member(API_Item):
-    datafields = ['bio', 'name', 'link','id','photo_url', 'zip','lat','lon','city','state','country','joined','visited']
+
+    datafields = ['bio', 'birthday', 'country, city, state', 'email', 
+            'gender', 'hometown', 'id', 'joined', 'lang', 'lat, lon', 'link',
+            'membership_count', 'messagable', 'messaging_pref', 'name',
+            'other_services', 'photo', 'photo_url', 'photos', 'privacy',
+            'reachable', 'self', 'topics', 'visited']
     
     def get_groups(self, apiclient, **extraparams):
         extraparams.update({'member_id':self.id})
@@ -272,17 +301,26 @@ class Member(API_Item):
         return "Member %s (url: %s)" % (self.name, self.link)
 
 class Photo(API_Item):
-    datafields = ['albumtitle', 'link', 'member_url', 'descr', 'created', 'photo_url', 'photo_urls', 'thumb_urls']
+
+    datafields = ['caption', 'created', 'highres_link', 'member', 
+            'member_photo', 'photo_album', 'photo_id', 'photo_link', 
+            'self', 'site_link', 'thumb_link', 'updated']
 
     def __str__(self):
         return "Photo located at %s posted by member at %s: (%s)" % (self.link, self.member_url, self.descr)
 
 
 class Event(API_Item):
-    datafields = ['id', 'name', 'updated', 'time', 'photo_url', 'event_url', 'description', 'status', \
-        'rsvpcount', 'no_rsvpcount', 'maybe_rsvpcount', \
-        'venue_id', 'venue_name', 'venue_phone', 'venue_address1', 'venue_address3', 'venue_address2', 'venue_city', 'venue_state', 'venue_zip', \
-        'venue_map', 'venue_lat', 'venue_lon', 'venue_visibility', 'utc_rsvp_open_time']
+    datafields = ['announced', 'comment_count', 'created', 'description', 
+            'distance', 'duration', 'email_reminders', 'event_hosts', 
+            'event_url', 'featured', 'fee', 'group', 'headcount', 
+            'how_to_find_us', 'id', 'is_simplehtml', 'maybe_rsvp_count', 
+            'name', 'photo_album_id', 'photo_count', 'photo_url', 
+            'publish_status', 'rating', 'rsvp_alerts', 'rsvp_limit', 
+            'rsvp_rules', 'rsvpable', 'self', 'short_link', 
+            'simple_html_description', 'status', 'survey_questions', 
+            'time', 'timezone', 'trending_rank', 'updated', 'utc_offset', 
+            'venue', 'venue_visibility', 'visibility', 'why', 'yes_rsvp_count']
 
     def __str__(self):
         return 'Event %s named %s at %s (url: %s)' % (self.id, self.name, self.time, self.event_url)
@@ -298,12 +336,16 @@ class Rsvp(API_Item):
         return 'Rsvp by %s (%s) with comment: %s' % (self.name, self.link, self.comment)
 
 class Group(API_Item):
-    datafields = [ 'id','name','group_urlname','link','updated',\
-                   'members','created','photo_url',\
-                   'description','zip','lat','lon',\
-                   'city','state','country','organizerProfileURL', \
-                   'topics']
-    
+
+    datafields = ['category', 'city', 'country', 'created', 'description',
+            'ga_code', 'group_photo', 'id', 'is_simplehtml', 'join_info',
+            'join_mode', 'lat', 'link', 'list_addr', 'list_mode', 'lon',
+            'members', 'membership_dues', 'name', 'next_event', 'organizer',
+            'other_services', 'pending_members', 'photos', 'primary_topic',
+            'rating', 'self', 'short_link', 'similar_groups',
+            'simple_html_description', 'sponsors', 'state', 'timezone',
+            'topics', 'urlname', 'visibility', 'welcome_message', 'who']    
+
     def __str__(self):
          return "%s (%s)" % (self.name, self.link)
 
@@ -320,7 +362,9 @@ class Group(API_Item):
         return apiclient.get_members(**extraparams)
 
 class City(API_Item):
-    datafields = ['city','country','state','zip','members','lat','lon']
+
+    datafields = ['city', 'country', 'distance', 'id', 'lat', 'lon', 
+            'member_count', 'name_string', 'ranking', 'state', 'zip']
 
     def __str__(self):
          return "%s %s, %s, %s, with %s members" % (self.city, self.zip, self.country, self.state, self.members)
