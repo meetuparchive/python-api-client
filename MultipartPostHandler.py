@@ -38,10 +38,13 @@ Further Example:
   then uploads it to the W3C validator.
 """
 
-import urllib
-import urllib2
-import mimetools, mimetypes
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
+#import mimetools 
+import mimetypes
 import os, stat
+import string
+import random
 
 class Callable:
     def __init__(self, anycallable):
@@ -51,8 +54,8 @@ class Callable:
 #  assigning a sequence.
 doseq = 1
 
-class MultipartPostHandler(urllib2.BaseHandler):
-    handler_order = urllib2.HTTPHandler.handler_order - 10 # needs to run first
+class MultipartPostHandler(urllib.request.BaseHandler):
+    handler_order = urllib.request.HTTPHandler.handler_order - 10 # needs to run first
 
     def http_request(self, request):
         data = request.get_data()
@@ -60,31 +63,34 @@ class MultipartPostHandler(urllib2.BaseHandler):
             v_files = []
             v_vars = []
             try:
-                 for(key, value) in data.items():
+                 for(key, value) in list(data.items()):
                      if type(value) == file:
                          v_files.append((key, value))
                      else:
                          v_vars.append((key, value))
             except TypeError:
                 systype, value, traceback = sys.exc_info()
-                raise TypeError, "not a valid non-string sequence or mapping object", traceback
+                raise TypeError("not a valid non-string sequence or mapping object").with_traceback(traceback)
 
             if len(v_files) == 0:
-                data = urllib.urlencode(v_vars, doseq)
+                data = urllib.parse.urlencode(v_vars, doseq)
             else:
                 boundary, data = self.multipart_encode(v_vars, v_files)
                 contenttype = 'multipart/form-data; boundary=%s' % boundary
                 if(request.has_header('Content-Type')
                    and request.get_header('Content-Type').find('multipart/form-data') != 0):
-                    print "Replacing %s with %s" % (request.get_header('content-type'), 'multipart/form-data')
+                    print("Replacing %s with %s" % (request.get_header('content-type'), 'multipart/form-data'))
                 request.add_unredirected_header('Content-Type', contenttype)
 
             request.add_data(data)
         return request
 
+    def id_generator(size=10, chars=string.ascii_uppercase + string.digits):
+        return ''.join(random.choice(chars) for _ in range(size))
+
     def multipart_encode(vars, files, boundary = None, buffer = None):
         if boundary is None:
-            boundary = mimetools.choose_boundary()
+            boundary = id_generator()
         if buffer is None:
             buffer = ''
         for(key, value) in vars:
@@ -103,15 +109,15 @@ class MultipartPostHandler(urllib2.BaseHandler):
             buffer += '\r\n' + fd.read() + '\r\n'
         buffer += '--%s--\r\n\r\n' % boundary
         return boundary, buffer
-    multipart_encode = Callable(multipart_encode)
 
+    multipart_encode = Callable(multipart_encode)
     https_request = http_request
 
 def main():
     import tempfile, sys
 
     validatorURL = "http://validator.w3.org/check"
-    opener = urllib2.build_opener(MultipartPostHandler)
+    opener = urllib.request.build_opener(MultipartPostHandler)
 
     def validateFile(url):
         temp = tempfile.mkstemp(suffix=".html")
@@ -119,7 +125,7 @@ def main():
         params = { "ss" : "0",            # show source
                    "doctype" : "Inline",
                    "uploaded_file" : open(temp[1], "rb") }
-        print opener.open(validatorURL, params).read()
+        print(opener.open(validatorURL, params).read())
         os.remove(temp[1])
 
     if len(sys.argv[1:]) > 0:
