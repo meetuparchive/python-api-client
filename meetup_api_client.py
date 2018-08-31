@@ -1,13 +1,13 @@
-#!/usr/bin/env python
-from __future__ import with_statement
+
 
 import datetime
 import time
 import cgi
 import types
 import logging
-from urllib import urlencode
-from urllib2 import HTTPError, HTTPErrorProcessor, urlopen, Request, build_opener
+from urllib.parse import urlencode
+from urllib.error import HTTPError
+from urllib.request import urlopen, Request, build_opener, HTTPErrorProcessor
 
 import oauth
 import MultipartPostHandler as mph
@@ -30,7 +30,7 @@ try:
             import simplejson
             parse_json = lambda s: simplejson.loads(s.decode(API_JSON_ENCODING))
 except:
-    print "Error - your system is missing support for a JSON parsing library."
+    print("Error - your system is missing support for a JSON parsing library.")
 
 GROUPS_URI = '2/groups'
 EVENTS_URI = '2/events'
@@ -66,7 +66,7 @@ class MeetupHTTPErrorProcessor(HTTPErrorProcessor):
     def http_response(self, request, response):
         try:
             return HTTPErrorProcessor.http_response(self, request, response)
-        except HTTPError, e:
+        except HTTPError as e:
             data = e.read()
 
             try:
@@ -148,8 +148,8 @@ def _generate_read_method(name):
     def read_method(self, **args):
         return API_Response(self._fetch(name, **args), name)
     return read_method
-for method, uri in READ_METHODS.items():
-    read_method = types.MethodType(_generate_read_method(uri), None, Meetup)
+for method, uri in list(READ_METHODS.items()):
+    read_method = types.MethodType(_generate_read_method(uri), Meetup)
     setattr(Meetup, 'get_' + method, read_method)
 
 class NoToken(Exception):
@@ -283,7 +283,7 @@ class API_Item(object):
          """load properties that are relevant to all items (id, etc.)"""
          for field in self.datafields:
              # Not all fields are required to be returned
-             if properties.has_key(field):
+             if field in properties:
                 self.__setattr__(field, properties[field])
          self.json = properties
 
