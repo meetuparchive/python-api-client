@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import with_statement
+
 
 """
     Simple, partial test of client. Obtains an access token for the given consumer
@@ -7,10 +7,10 @@ from __future__ import with_statement
     http://www.meetup.com/account/oauth_apps/
 """
 
-import ConfigParser
+import configparser
 
-import meetup_api_client as mac
-from meetup_api_client import *
+from . import meetup_api_client as mac
+from .meetup_api_client import *
 
 from optparse import OptionParser
 import webbrowser
@@ -22,7 +22,7 @@ def config_client(config_name=None):
 def get_config(name=None):
     name = name or 'app.cfg'
 
-    config = ConfigParser.ConfigParser()
+    config = configparser.ConfigParser()
     config.optionxform = str
     config.read(name)
     
@@ -69,12 +69,12 @@ if __name__ == '__main__':
     mucli = get_client(config)
     
     def access_granted():
-        print """\
+        print("""\
     access-key:     %s
     accses-secret:  %s
     
     Congratulations, you've got an access token! Try it out in an interpreter.
-              """ % get_token(config, 'access')
+              """ % get_token(config, 'access'))
 
     if config.has_section('access'):
         access_granted()
@@ -84,7 +84,7 @@ if __name__ == '__main__':
                 sys.exit("To complete the process you must supply a --verifier")
             request_key, request_secret = get_token(config, 'request')
             oauth_session = mucli.new_session(request_key=request_key, request_secret=request_secret)
-            print "    member_id:      %s" % oauth_session.fetch_access_token(options.verifier)
+            print("    member_id:      %s" % oauth_session.fetch_access_token(options.verifier))
             set_token(config, 'access', oauth_session.access_token.key, oauth_session.access_token.secret)
             access_granted()
         else:
@@ -97,7 +97,7 @@ if __name__ == '__main__':
                 url = oauth_session.get_authenticate_url()
             else:
                 url = oauth_session.get_authorize_url()
-            print "Opening a browser on the authorization page: %s" % url
+            print("Opening a browser on the authorization page: %s" % url)
             webbrowser.open(url)
         
    

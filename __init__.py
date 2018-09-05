@@ -1,1 +1,1 @@
-from meetup_api_client import *
+from .meetup_api_client import *
